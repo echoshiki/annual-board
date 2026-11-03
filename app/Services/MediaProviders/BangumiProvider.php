@@ -77,6 +77,11 @@ class BangumiProvider implements MediaProviderInterface
             $client->withToken($token);
         }
 
+        $proxy = config('services.third_party_proxy');
+        if (! empty($proxy)) {
+            $client->withOptions(['proxy' => $proxy]);
+        }
+
         return $client;
     }
 

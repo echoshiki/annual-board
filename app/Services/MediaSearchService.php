@@ -7,7 +7,9 @@ use App\Enums\MediaType;
 use App\Models\MediaItem;
 use App\Models\SearchQuery;
 use App\Services\MediaProviders\BangumiProvider;
+use App\Services\MediaProviders\DoubanGameProvider;
 use App\Services\MediaProviders\MusicBrainzProvider;
+use App\Services\MediaProviders\SteamProvider;
 use App\Services\MediaProviders\TmdbProvider;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -216,7 +218,11 @@ class MediaSearchService
         return match ($type) {
             MediaType::MOVIE, MediaType::TV => app(TmdbProvider::class),
             MediaType::MUSIC => app(MusicBrainzProvider::class),
-            MediaType::GAME => app(BangumiProvider::class),
+            MediaType::GAME => match (config('services.media_providers.game', 'steam')) {
+                'bangumi' => app(BangumiProvider::class),
+                'douban' => app(DoubanGameProvider::class),
+                default => app(SteamProvider::class),
+            },
         };
     }
 

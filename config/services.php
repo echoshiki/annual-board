@@ -59,4 +59,21 @@ return [
         'timeout' => (int) env('BANGUMI_TIMEOUT', 10),
     ],
 
+    'steam' => [
+        'base_url' => env('STEAM_BASE_URL', 'https://store.steampowered.com'),
+        'timeout' => (int) env('STEAM_TIMEOUT', 10),
+    ],
+
+    'douban' => [
+        'base_url' => env('DOUBAN_BASE_URL', 'https://www.douban.com'),
+        'user_agent' => env('DOUBAN_USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'),
+        'timeout' => (int) env('DOUBAN_TIMEOUT', 10),
+    ],
+
+    'third_party_proxy' => env('THIRD_PARTY_PROXY'),
+
+    'media_providers' => [
+        'game' => env('GAME_PROVIDER', 'steam'), // steam | bangumi | douban
+    ],
+
 ];
