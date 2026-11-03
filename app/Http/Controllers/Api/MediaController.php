@@ -6,21 +6,28 @@ use App\Enums\MediaType;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\MediaItemResource;
 use App\Models\MediaItem;
+use App\Models\SearchQuery;
+use App\Services\MediaSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class MediaController extends Controller
 {
+    public function __construct(
+        protected MediaSearchService $searchService
+    ) {}
+
     /**
      * 统一搜索接口
-     * GET /api/media/search?type=game&keyword=塞尔达
+     * GET /api/media/search?type=movie&keyword=周星驰&refresh=0
      */
     public function search(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'type' => ['required', 'string', Rule::enum(MediaType::class)],
             'keyword' => ['required', 'string', 'min:1', 'max:100'],
+            'refresh' => ['nullable', 'boolean'],
         ], [
             'type.required' => '请指定媒体类型 (type: movie, tv, game, music)',
             'type.Illuminate\Validation\Rules\Enum' => '媒体类型仅支持: movie, tv, game, music',
@@ -29,25 +36,62 @@ class MediaController extends Controller
 
         $type = MediaType::from($validated['type']);
         $keyword = trim($validated['keyword']);
+        $forceRefresh = $request->boolean('refresh', false);
 
-        // 第一步：目前先从本地数据库检索（第二步将接入 MediaSearchService 联动第三方 API 与 Redis）
-        $items = MediaItem::query()
-            ->searchLocal($type, $keyword)
+        $result = $this->searchService->search($type, $keyword, limit: 20, forceRefresh: $forceRefresh);
+        $searchQuery = $result['search_query'];
+
+        $meta = [
+            'type' => $type->value,
+            'type_label' => $type->label(),
+            'keyword' => $keyword,
+            'provider' => $result['provider'],
+            'hit_source' => $result['hit_source'], // remote_api | cache | database | database_fallback
+            'count' => $result['items']->count(),
+            'search_count' => $searchQuery?->search_count,
+            'api_request_count' => $searchQuery?->api_request_count,
+            'last_duration_ms' => $searchQuery?->last_duration_ms,
+            'last_api_requested_at' => $searchQuery?->last_api_requested_at?->toDateTimeString(),
+        ];
+
+        // 调试模式下如果远程 API 发生网络报错触发了降级，在 meta 中附上错误原因便于排查
+        if (config('app.debug') && ! empty($result['error'])) {
+            $meta['api_error'] = $result['error'];
+        }
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'ok',
+            'meta' => $meta,
+            'data' => MediaItemResource::collection($result['items']),
+        ]);
+    }
+
+    /**
+     * 查询搜索词统计与第三方 API 请求日志列表
+     * GET /api/media/queries?type=movie&zero_only=1
+     */
+    public function queries(Request $request): JsonResponse
+    {
+        $query = SearchQuery::query();
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->string('type'));
+        }
+
+        if ($request->boolean('zero_only')) {
+            $query->where('result_count', 0);
+        }
+
+        $list = $query->orderByDesc('search_count')
             ->orderByDesc('updated_at')
-            ->limit(20)
+            ->limit(50)
             ->get();
 
         return response()->json([
             'code' => 0,
             'message' => 'ok',
-            'meta' => [
-                'type' => $type->value,
-                'type_label' => $type->label(),
-                'keyword' => $keyword,
-                'hit_source' => 'database',
-                'count' => $items->count(),
-            ],
-            'data' => MediaItemResource::collection($items),
+            'data' => $list,
         ]);
     }
 
@@ -97,4 +141,3 @@ class MediaController extends Controller
         ], 201);
     }
 }
-

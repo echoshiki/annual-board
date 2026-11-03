@@ -35,4 +35,28 @@ return [
         ],
     ],
 
+    'tmdb' => [
+        'token' => env('TMDB_API_TOKEN'),
+        'key' => env('TMDB_API_KEY'),
+        'base_url' => env('TMDB_BASE_URL', 'https://api.themoviedb.org/3'),
+        'image_base_url' => env('TMDB_IMAGE_BASE_URL', 'https://image.tmdb.org/t/p/w500'),
+        'timeout' => (int) env('TMDB_TIMEOUT', 10),
+    ],
+
+    'musicbrainz' => [
+        'client_id' => env('MUSICBRAINZ_CLIENT_ID'),
+        'client_secret' => env('MUSICBRAINZ_CLIENT_SECRET'),
+        'base_url' => env('MUSICBRAINZ_BASE_URL', 'https://musicbrainz.org/ws/2'),
+        'cover_base_url' => env('MUSICBRAINZ_COVER_BASE_URL', 'https://coverartarchive.org'),
+        'user_agent' => env('MUSICBRAINZ_USER_AGENT', 'AnnualBoard/1.0 (contact@example.com)'),
+        'timeout' => (int) env('MUSICBRAINZ_TIMEOUT', 10),
+    ],
+
+    'bangumi' => [
+        'token' => env('BANGUMI_ACCESS_TOKEN'),
+        'base_url' => env('BANGUMI_BASE_URL', 'https://api.bgm.tv'),
+        'user_agent' => env('BANGUMI_USER_AGENT', 'shiki/annual-board (https://github.com/annual-board)'),
+        'timeout' => (int) env('BANGUMI_TIMEOUT', 10),
+    ],
+
 ];
