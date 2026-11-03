@@ -10,7 +10,10 @@ use App\Models\SearchQuery;
 use App\Services\MediaSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class MediaController extends Controller
 {
@@ -139,5 +142,55 @@ class MediaController extends Controller
             'message' => 'saved',
             'data' => new MediaItemResource($item),
         ], 201);
+    }
+
+    /**
+     * 图片代理接口（解决前端 Canvas 绘制海报跨域污染与第三方防盗链问题）
+     * GET /api/media/image-proxy?url=https://...
+     */
+    public function imageProxy(Request $request): Response
+    {
+        $url = trim((string) $request->query('url', ''));
+
+        if ($url === '' || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            abort(400, 'Invalid image url');
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            abort(400, 'Unsupported url scheme');
+        }
+
+        try {
+            $client = Http::timeout(10)
+                ->withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+                ->withOptions(['allow_redirects' => true]);
+
+            $proxy = config('services.third_party_proxy');
+            if (! empty($proxy)) {
+                $client->withOptions(['proxy' => $proxy]);
+            }
+
+            // 针对豆瓣图床补充 Referer 防盗链头
+            if (str_contains($url, 'doubanio.com')) {
+                $client->withHeaders(['Referer' => 'https://movie.douban.com/']);
+            }
+
+            $response = $client->get($url);
+
+            if (! $response->successful()) {
+                abort(404, 'Image fetch failed');
+            }
+
+            $contentType = $response->header('Content-Type') ?: 'image/jpeg';
+
+            return response($response->body(), 200, [
+                'Content-Type' => $contentType,
+                'Cache-Control' => 'public, max-age=604800',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        } catch (Throwable) {
+            abort(404, 'Image unavailable');
+        }
     }
 }
